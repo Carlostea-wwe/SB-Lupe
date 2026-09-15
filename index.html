@@ -12,23 +12,29 @@
       box-sizing: border-box;
     }
 
-    body {
-      font-family: Arial, sans-serif;
-      background-color: #000;
-      color: white;
+    html, body {
+      width: 100%;
+      height: 100%;
       margin: 0;
       padding: 0;
-      height: 100vh;
+      background-color: #000;
+      color: white;
+      font-family: Arial, sans-serif;
       overflow: hidden;
+    }
+
+    /* Container füllt genau den verfügbaren Bildschirmplatz */
+    .app-container {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
       display: flex;
       flex-direction: column;
     }
 
-    /* Kamerabereich nutzt 90% des Bildschirms */
     .camera-container {
+      flex: 1;
       position: relative;
-      width: 100%;
-      height: 90vh;
       overflow: hidden;
       background-color: #000;
       display: flex;
@@ -47,17 +53,20 @@
       filter: invert(100%);
     }
 
-    /* Sehr schlanker Kontrollbereich unten (10% der Höhe) */
+    /* Kompakter Kontrollbereich am unteren Rand */
     .controls {
-      height: 10vh;
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      padding: 10px 15px 15px 15px;
+      gap: 8px;
+      background: rgba(0, 0, 0, 0.65);
+      backdrop-filter: blur(4px);
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
-      width: 100%;
-      padding: 5px 15px;
-      gap: 4px;
-      background-color: rgba(20, 20, 20, 0.9);
+      z-index: 10;
     }
 
     .slider-container {
@@ -65,30 +74,30 @@
       align-items: center;
       width: 100%;
       max-width: 400px;
-      gap: 8px;
-      font-size: 0.8rem;
+      gap: 10px;
+      font-size: 0.85rem;
+      font-weight: bold;
     }
 
     input[type=range] {
       flex-grow: 1;
-      height: 4px;
+      height: 6px;
     }
 
     .btn-group {
       display: flex;
-      gap: 8px;
+      gap: 10px;
       width: 100%;
       max-width: 400px;
     }
 
-    /* Kompakte, kleine Buttons */
     button {
       flex: 1;
-      padding: 5px 8px;
-      font-size: 0.8rem;
+      padding: 8px 10px;
+      font-size: 0.85rem;
       font-weight: bold;
-      border: none;
-      border-radius: 4px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 6px;
       cursor: pointer;
       color: white;
     }
@@ -104,20 +113,22 @@
 </head>
 <body>
 
-  <div class="camera-container">
-    <video id="webcam" autoplay playsinline></video>
-  </div>
-
-  <div class="controls">
-    <div class="slider-container">
-      <span>1x</span>
-      <input type="range" id="zoom-slider" min="1" max="5" step="0.05" value="1">
-      <span>5x</span>
+  <div class="app-container">
+    <div class="camera-container" id="cam-box">
+      <video id="webcam" autoplay playsinline></video>
     </div>
-    
-    <div class="btn-group">
-      <button id="btn-invert">Invertieren</button>
-      <button id="btn-fullscreen">Vollbild</button>
+
+    <div class="controls">
+      <div class="slider-container">
+        <span>1x</span>
+        <input type="range" id="zoom-slider" min="1" max="5" step="0.05" value="1">
+        <span>5x</span>
+      </div>
+      
+      <div class="btn-group">
+        <button id="btn-invert">Invertieren</button>
+        <button id="btn-fullscreen">Vollbild</button>
+      </div>
     </div>
   </div>
 
@@ -139,16 +150,19 @@
       }
     }
 
+    // Zoom-Logik
     zoomSlider.addEventListener('input', (event) => {
       video.style.transform = `scale(${event.target.value})`;
     });
 
+    // Farbumkehr
     btnInvert.addEventListener('click', () => {
       video.classList.toggle('invert-colors');
       btnInvert.style.backgroundColor = video.classList.contains('invert-colors') ? "#dc3545" : "#007bff";
     });
 
-    btnFullscreen.addEventListener('click', () => {
+    // Vollbild umschalten
+    function toggleFullscreen() {
       if (!document.fullscreenElement) {
         if (document.documentElement.requestFullscreen) {
           document.documentElement.requestFullscreen();
@@ -163,6 +177,17 @@
           document.webkitExitFullscreen();
         }
         btnFullscreen.innerText = "Vollbild";
+      }
+    }
+
+    btnFullscreen.addEventListener('click', toggleFullscreen);
+
+    // Automatischer Vollbildmodus beim ersten Tippen irgendwo auf den Bildschirm
+    let autoFullscreenDone = false;
+    document.addEventListener('click', (e) => {
+      if (!autoFullscreenDone && !document.fullscreenElement) {
+        toggleFullscreen();
+        autoFullscreenDone = true;
       }
     });
 
