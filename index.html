@@ -23,11 +23,15 @@
       overflow: hidden;
     }
 
-    /* Container füllt genau den verfügbaren Bildschirmplatz */
+    /* Container füllt genau den verfügbaren Bildschirmplatz.
+       100dvh statt 100vh, weil vh auf Mobilgeräten die Höhe inklusive
+       der (ein-/ausblendbaren) Adressleiste rechnet — dadurch wurden
+       die unteren Buttons vom Browser-UI abgeschnitten. */
     .app-container {
       position: relative;
       width: 100vw;
       height: 100vh;
+      height: 100dvh;
       display: flex;
       flex-direction: column;
     }
@@ -59,7 +63,7 @@
       bottom: 0;
       left: 0;
       width: 100%;
-      padding: 10px 15px 15px 15px;
+      padding: 10px 15px calc(15px + env(safe-area-inset-bottom)) 15px;
       gap: 8px;
       background: rgba(0, 0, 0, 0.65);
       backdrop-filter: blur(4px);
@@ -82,6 +86,18 @@
     input[type=range] {
       flex-grow: 1;
       height: 6px;
+      accent-color: #007bff;
+    }
+
+    /* Wird per JS gesetzt, sobald der Zoom über die optische Grenze
+       hinaus in den (unschärferen) Digitalzoom-Bereich geht. */
+    input[type=range].digital-zoom {
+      accent-color: #ff9500;
+    }
+
+    #zoom-value {
+      min-width: 3.5em;
+      text-align: center;
     }
 
     .btn-group {
@@ -140,6 +156,7 @@
     </div>
 
     <div class="controls">
+      <div id="zoom-value" aria-hidden="true">1,0x</div>
       <div class="slider-container">
         <span id="zoom-min-label" aria-hidden="true">1x</span>
         <label for="zoom-slider" class="sr-only">Zoomstufe</label>
@@ -162,12 +179,14 @@
     const zoomSlider = document.getElementById('zoom-slider');
     const zoomMinLabel = document.getElementById('zoom-min-label');
     const zoomMaxLabel = document.getElementById('zoom-max-label');
+    const zoomValueEl = document.getElementById('zoom-value');
     const btnInvert = document.getElementById('btn-invert');
     const btnTorch = document.getElementById('btn-torch');
     const btnFullscreen = document.getElementById('btn-fullscreen');
 
     let currentTrack = null;
     let zoomCapable = false;
+    let opticalMax = 1; // Grenze, ab der weiterer Zoom nur noch digital (CSS) erfolgt
     let torchOn = false;
 
     async function startCamera() {
@@ -200,12 +219,21 @@
       // damit das Bild beim Reinzoomen scharf bleibt.
       if (caps.zoom) {
         zoomCapable = true;
+        opticalMax = caps.zoom.max;
+        // Slider bewusst über die optische Grenze hinaus verlängern:
+        // darüber wird per CSS digital nachvergrößert, damit auch Geräte
+        // mit wenig optischem Zoom bis auf hohe Stufen kommen.
+        const sliderMax = Math.max(caps.zoom.max, 10);
         zoomSlider.min = caps.zoom.min;
-        zoomSlider.max = caps.zoom.max;
+        zoomSlider.max = sliderMax;
         zoomSlider.step = caps.zoom.step || 0.1;
         zoomSlider.value = caps.zoom.min;
         zoomMinLabel.textContent = `${caps.zoom.min}x`;
-        zoomMaxLabel.textContent = `${caps.zoom.max}x`;
+        zoomMaxLabel.textContent = `${sliderMax}x`;
+      } else {
+        // Keine Hardware-Zoomstufe verfügbar: der komplette Bereich
+        // läuft von Anfang an über den Digitalzoom-Fallback.
+        opticalMax = 1;
       }
 
       if (caps.torch) {
@@ -213,20 +241,34 @@
       }
     }
 
-    // Zoom-Logik: bevorzugt echten Kamera-Zoom, sonst CSS-Skalierung als Fallback
+    // Zeigt die aktuelle Zoomstufe live an und markiert den Slider farblich,
+    // sobald man die optische Grenze verlässt und nur noch digital
+    // (unschärfer) weitergezoomt wird.
+    function updateZoomDisplay(value, isDigital) {
+      zoomValueEl.textContent = `${value.toFixed(1)}x`;
+      zoomSlider.setAttribute('aria-valuetext', `${value.toFixed(1)}x Zoom${isDigital ? ' (digital)' : ''}`);
+      zoomSlider.classList.toggle('digital-zoom', isDigital);
+    }
+
+    // Zoom-Logik: bis zur optischen Grenze echter Kamera-Zoom (scharf),
+    // darüber hinaus zusätzlich CSS-Skalierung als Digitalzoom-Fallback.
     zoomSlider.addEventListener('input', async (event) => {
       const value = parseFloat(event.target.value);
-      zoomSlider.setAttribute('aria-valuetext', `${value.toFixed(1)}x Zoom`);
+      const isDigital = value > opticalMax;
 
       if (zoomCapable && currentTrack) {
         try {
-          await currentTrack.applyConstraints({ advanced: [{ zoom: value }] });
+          const hardwareZoom = Math.min(value, opticalMax);
+          await currentTrack.applyConstraints({ advanced: [{ zoom: hardwareZoom }] });
+          video.style.transform = isDigital ? `scale(${value / opticalMax})` : 'scale(1)';
         } catch (err) {
           video.style.transform = `scale(${value})`;
         }
       } else {
         video.style.transform = `scale(${value})`;
       }
+
+      updateZoomDisplay(value, isDigital);
     });
 
     // Farbumkehr
