@@ -4,6 +4,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <!-- Vollbild-Modus für Android-Home-Screen (PWA) -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
   <title>Kamera Lupe</title>
   <style>
     * {
@@ -23,11 +26,11 @@
       overflow: hidden;
     }
 
-    /* Container für die Kamera - schneidet alles ab, was durch den Zoom übersteht */
+    /* Kamera-Container nutzt im normalen Modus den Großteil des Bildschirms */
     .camera-container {
       position: relative;
       width: 100%;
-      height: 75vh;
+      height: 70vh;
       overflow: hidden;
       background-color: #000;
       display: flex;
@@ -35,16 +38,13 @@
       align-items: center;
     }
 
-    /* Das eigentliche Videobild */
     video {
       width: 100%;
       height: 100%;
       object-fit: cover;
-      /* Weicher Übergang beim Zoomen */
       transition: transform 0.2s ease-out; 
     }
 
-    /* CSS-Klasse, die per Knopfdruck hinzugefügt wird, um Farben umzukehren */
     .invert-colors {
       filter: invert(100%);
     }
@@ -55,13 +55,12 @@
       flex-direction: column;
       align-items: center;
       width: 100%;
-      padding: 20px;
-      gap: 15px;
+      padding: 15px;
+      gap: 12px;
       background-color: #333;
       flex-grow: 1;
     }
 
-    /* Styling für den Zoom-Slider */
     .slider-container {
       display: flex;
       align-items: center;
@@ -74,51 +73,63 @@
       flex-grow: 1;
     }
 
-    button {
-      padding: 12px 20px;
-      font-size: 1.1rem;
-      font-weight: bold;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-      background-color: #007bff;
-      color: white;
+    .btn-group {
+      display: flex;
+      gap: 10px;
       width: 100%;
       max-width: 400px;
     }
 
-    button:active {
-      background-color: #0056b3;
+    button {
+      flex: 1;
+      padding: 12px 10px;
+      font-size: 1rem;
+      font-weight: bold;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      color: white;
+    }
+
+    #btn-invert {
+      background-color: #007bff;
+    }
+
+    #btn-fullscreen {
+      background-color: #6c757d;
     }
   </style>
 </head>
 <body>
 
-  <!-- Live-Kamera -->
-  <div class="camera-container">
+  <div class="camera-container" id="cam-box">
     <video id="webcam" autoplay playsinline></video>
   </div>
 
-  <!-- Steuerungselemente -->
   <div class="controls">
     <div class="slider-container">
       <span>1x</span>
       <input type="range" id="zoom-slider" min="1" max="3" step="0.1" value="1">
       <span>3x</span>
     </div>
-    <button id="btn-invert">Farben umkehren</button>
+    
+    <div class="btn-group">
+      <button id="btn-invert">Farben umkehren</button>
+      <button id="btn-fullscreen">Vollbild</button>
+    </div>
   </div>
 
   <script>
     const video = document.getElementById('webcam');
     const zoomSlider = document.getElementById('zoom-slider');
     const btnInvert = document.getElementById('btn-invert');
+    const btnFullscreen = document.getElementById('btn-fullscreen');
 
-    // 1. Kamera starten (Fokus auf Rückkamera)
+    // 1. Kamera starten
     async function startCamera() {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "environment" }, // Rückkamera erzwingen
+          video: { facingMode: "environment" },
           audio: false
         });
         video.srcObject = stream;
@@ -129,26 +140,36 @@
 
     // 2. Zoom-Logik
     zoomSlider.addEventListener('input', (event) => {
-      const zoomValue = event.target.value;
-      // Wendet die Skalierung auf das Video-Element an
-      video.style.transform = `scale(${zoomValue})`;
+      video.style.transform = `scale(${event.target.value})`;
     });
 
-    // 3. Farbumkehr-Logik
+    // 3. Farbumkehr
     btnInvert.addEventListener('click', () => {
-      // Schaltet die CSS-Klasse ein oder aus
       video.classList.toggle('invert-colors');
-      
-      if (video.classList.contains('invert-colors')) {
-        btnInvert.innerText = "Farben normal";
-        btnInvert.style.backgroundColor = "#dc3545"; // Rot zur optischen Bestätigung
+      btnInvert.style.backgroundColor = video.classList.contains('invert-colors') ? "#dc3545" : "#007bff";
+    });
+
+    // 4. Vollbild-Logik
+    btnFullscreen.addEventListener('click', () => {
+      if (!document.fullscreenElement) {
+        // In den Vollbildmodus wechseln
+        if (document.documentElement.requestFullscreen) {
+          document.documentElement.requestFullscreen();
+        } else if (document.documentElement.webkitRequestFullscreen) { /* Safari / ältere Browser */
+          document.documentElement.webkitRequestFullscreen();
+        }
+        btnFullscreen.innerText = "Vollbild beenden";
       } else {
-        btnInvert.innerText = "Farben umkehren";
-        btnInvert.style.backgroundColor = "#007bff"; // Zurück zu Blau
+        // Vollbild beenden
+        if (document.exitFullscreen) {
+          document.exitFullscreen();
+        } else if (document.webkitExitFullscreen) {
+          document.webkitExitFullscreen();
+        }
+        btnFullscreen.innerText = "Vollbild";
       }
     });
 
-    // App starten
     startCamera();
   </script>
 
