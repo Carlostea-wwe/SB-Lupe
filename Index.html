@@ -1,0 +1,156 @@
+
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Kamera Lupe</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background-color: #222;
+      color: white;
+      margin: 0;
+      padding: 0;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* Container für die Kamera - schneidet alles ab, was durch den Zoom übersteht */
+    .camera-container {
+      position: relative;
+      width: 100%;
+      height: 75vh;
+      overflow: hidden;
+      background-color: #000;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    /* Das eigentliche Videobild */
+    video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      /* Weicher Übergang beim Zoomen */
+      transition: transform 0.2s ease-out; 
+    }
+
+    /* CSS-Klasse, die per Knopfdruck hinzugefügt wird, um Farben umzukehren */
+    .invert-colors {
+      filter: invert(100%);
+    }
+
+    /* Kontrollbereich unten */
+    .controls {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 100%;
+      padding: 20px;
+      gap: 15px;
+      background-color: #333;
+      flex-grow: 1;
+    }
+
+    /* Styling für den Zoom-Slider */
+    .slider-container {
+      display: flex;
+      align-items: center;
+      width: 100%;
+      max-width: 400px;
+      gap: 10px;
+    }
+
+    input[type=range] {
+      flex-grow: 1;
+    }
+
+    button {
+      padding: 12px 20px;
+      font-size: 1.1rem;
+      font-weight: bold;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      background-color: #007bff;
+      color: white;
+      width: 100%;
+      max-width: 400px;
+    }
+
+    button:active {
+      background-color: #0056b3;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Live-Kamera -->
+  <div class="camera-container">
+    <video id="webcam" autoplay playsinline></video>
+  </div>
+
+  <!-- Steuerungselemente -->
+  <div class="controls">
+    <div class="slider-container">
+      <span>1x</span>
+      <input type="range" id="zoom-slider" min="1" max="3" step="0.1" value="1">
+      <span>3x</span>
+    </div>
+    <button id="btn-invert">Farben umkehren</button>
+  </div>
+
+  <script>
+    const video = document.getElementById('webcam');
+    const zoomSlider = document.getElementById('zoom-slider');
+    const btnInvert = document.getElementById('btn-invert');
+
+    // 1. Kamera starten (Fokus auf Rückkamera)
+    async function startCamera() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment" }, // Rückkamera erzwingen
+          audio: false
+        });
+        video.srcObject = stream;
+      } catch (err) {
+        alert("Fehler beim Zugriff auf die Kamera: " + err.message);
+      }
+    }
+
+    // 2. Zoom-Logik
+    zoomSlider.addEventListener('input', (event) => {
+      const zoomValue = event.target.value;
+      // Wendet die Skalierung auf das Video-Element an
+      video.style.transform = `scale(${zoomValue})`;
+    });
+
+    // 3. Farbumkehr-Logik
+    btnInvert.addEventListener('click', () => {
+      // Schaltet die CSS-Klasse ein oder aus
+      video.classList.toggle('invert-colors');
+      
+      if (video.classList.contains('invert-colors')) {
+        btnInvert.innerText = "Farben normal";
+        btnInvert.style.backgroundColor = "#dc3545"; // Rot zur optischen Bestätigung
+      } else {
+        btnInvert.innerText = "Farben umkehren";
+        btnInvert.style.backgroundColor = "#007bff"; // Zurück zu Blau
+      }
+    });
+
+    // App starten
+    startCamera();
+  </script>
+
+</body>
+</html>
