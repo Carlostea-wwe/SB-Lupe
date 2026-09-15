@@ -46,7 +46,7 @@
       width: 100%;
       height: 100%;
       object-fit: cover;
-      transition: transform 0.1s ease-out; 
+      transition: transform 0.1s ease-out;
     }
 
     .invert-colors {
@@ -102,63 +102,152 @@
       color: white;
     }
 
+    button:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
     #btn-invert {
       background-color: #007bff;
+    }
+
+    #btn-torch {
+      background-color: #6c757d;
     }
 
     #btn-fullscreen {
       background-color: #495057;
     }
+
+    /* Für Screenreader sichtbar, visuell ausgeblendet */
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
   </style>
 </head>
 <body>
-
   <div class="app-container">
     <div class="camera-container" id="cam-box">
-      <video id="webcam" autoplay playsinline></video>
+      <video id="webcam" autoplay playsinline muted></video>
     </div>
 
     <div class="controls">
       <div class="slider-container">
-        <span>1x</span>
-        <input type="range" id="zoom-slider" min="1" max="5" step="0.05" value="1">
-        <span>5x</span>
+        <span id="zoom-min-label" aria-hidden="true">1x</span>
+        <label for="zoom-slider" class="sr-only">Zoomstufe</label>
+        <input type="range" id="zoom-slider" min="1" max="5" step="0.05" value="1"
+               aria-label="Zoomstufe" aria-valuetext="1x Zoom">
+        <span id="zoom-max-label" aria-hidden="true">5x</span>
       </div>
-      
+
       <div class="btn-group">
-        <button id="btn-invert">Invertieren</button>
-        <button id="btn-fullscreen">Vollbild</button>
+        <button id="btn-invert" aria-pressed="false">Invertieren</button>
+        <button id="btn-torch" aria-pressed="false" disabled>Licht</button>
+        <button id="btn-fullscreen" aria-pressed="false">Vollbild</button>
       </div>
     </div>
   </div>
 
   <script>
     const video = document.getElementById('webcam');
+    const camBox = document.getElementById('cam-box');
     const zoomSlider = document.getElementById('zoom-slider');
+    const zoomMinLabel = document.getElementById('zoom-min-label');
+    const zoomMaxLabel = document.getElementById('zoom-max-label');
     const btnInvert = document.getElementById('btn-invert');
+    const btnTorch = document.getElementById('btn-torch');
     const btnFullscreen = document.getElementById('btn-fullscreen');
+
+    let currentTrack = null;
+    let zoomCapable = false;
+    let torchOn = false;
 
     async function startCamera() {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "environment" },
+          video: {
+            facingMode: "environment",
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
+            focusMode: "continuous"
+          },
           audio: false
         });
+
         video.srcObject = stream;
+        currentTrack = stream.getVideoTracks()[0];
+        setupTrackFeatures(currentTrack);
       } catch (err) {
         alert("Fehler beim Zugriff auf die Kamera: " + err.message);
       }
     }
 
-    // Zoom-Logik
-    zoomSlider.addEventListener('input', (event) => {
-      video.style.transform = `scale(${event.target.value})`;
+    // Prüft, was die Kamera-Hardware tatsächlich kann (Zoom, Taschenlampe)
+    // und richtet die Steuerelemente entsprechend ein.
+    function setupTrackFeatures(track) {
+      if (typeof track.getCapabilities !== "function") return;
+      const caps = track.getCapabilities();
+
+      // Echter optischer/sensorseitiger Zoom statt nur CSS-Skalierung,
+      // damit das Bild beim Reinzoomen scharf bleibt.
+      if (caps.zoom) {
+        zoomCapable = true;
+        zoomSlider.min = caps.zoom.min;
+        zoomSlider.max = caps.zoom.max;
+        zoomSlider.step = caps.zoom.step || 0.1;
+        zoomSlider.value = caps.zoom.min;
+        zoomMinLabel.textContent = `${caps.zoom.min}x`;
+        zoomMaxLabel.textContent = `${caps.zoom.max}x`;
+      }
+
+      if (caps.torch) {
+        btnTorch.disabled = false;
+      }
+    }
+
+    // Zoom-Logik: bevorzugt echten Kamera-Zoom, sonst CSS-Skalierung als Fallback
+    zoomSlider.addEventListener('input', async (event) => {
+      const value = parseFloat(event.target.value);
+      zoomSlider.setAttribute('aria-valuetext', `${value.toFixed(1)}x Zoom`);
+
+      if (zoomCapable && currentTrack) {
+        try {
+          await currentTrack.applyConstraints({ advanced: [{ zoom: value }] });
+        } catch (err) {
+          video.style.transform = `scale(${value})`;
+        }
+      } else {
+        video.style.transform = `scale(${value})`;
+      }
     });
 
     // Farbumkehr
     btnInvert.addEventListener('click', () => {
-      video.classList.toggle('invert-colors');
-      btnInvert.style.backgroundColor = video.classList.contains('invert-colors') ? "#dc3545" : "#007bff";
+      const active = video.classList.toggle('invert-colors');
+      btnInvert.style.backgroundColor = active ? "#dc3545" : "#007bff";
+      btnInvert.setAttribute('aria-pressed', String(active));
+    });
+
+    // Taschenlampe
+    btnTorch.addEventListener('click', async () => {
+      if (!currentTrack) return;
+      try {
+        torchOn = !torchOn;
+        await currentTrack.applyConstraints({ advanced: [{ torch: torchOn }] });
+        btnTorch.style.backgroundColor = torchOn ? "#dc3545" : "#6c757d";
+        btnTorch.setAttribute('aria-pressed', String(torchOn));
+      } catch (err) {
+        torchOn = !torchOn; // Zustand zurücksetzen, wenn es fehlschlägt
+        alert("Taschenlampe konnte nicht geschaltet werden: " + err.message);
+      }
     });
 
     // Vollbild umschalten
@@ -170,6 +259,7 @@
           document.documentElement.webkitRequestFullscreen();
         }
         btnFullscreen.innerText = "Beenden";
+        btnFullscreen.setAttribute('aria-pressed', 'true');
       } else {
         if (document.exitFullscreen) {
           document.exitFullscreen();
@@ -177,22 +267,42 @@
           document.webkitExitFullscreen();
         }
         btnFullscreen.innerText = "Vollbild";
+        btnFullscreen.setAttribute('aria-pressed', 'false');
       }
     }
 
     btnFullscreen.addEventListener('click', toggleFullscreen);
 
-    // Automatischer Vollbildmodus beim ersten Tippen irgendwo auf den Bildschirm
+    // Automatischer Vollbildmodus beim ersten Tippen auf das Kamerabild.
+    // Bewusst nur auf cam-box beschränkt, damit ein Tipp auf die
+    // Buttons/den Slider nicht versehentlich auch noch Vollbild auslöst.
     let autoFullscreenDone = false;
-    document.addEventListener('click', (e) => {
+    camBox.addEventListener('click', () => {
       if (!autoFullscreenDone && !document.fullscreenElement) {
         toggleFullscreen();
         autoFullscreenDone = true;
       }
     });
 
+    // Kamera stoppen, wenn die App in den Hintergrund geht oder
+    // die Seite verlassen wird (Akku, Privatsphäre, Kamera-LED).
+    function stopCamera() {
+      if (video.srcObject) {
+        video.srcObject.getTracks().forEach(track => track.stop());
+      }
+    }
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        stopCamera();
+      } else if (!video.srcObject || !video.srcObject.active) {
+        startCamera();
+      }
+    });
+
+    window.addEventListener('pagehide', stopCamera);
+
     startCamera();
   </script>
-
 </body>
 </html>
