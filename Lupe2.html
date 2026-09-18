@@ -8,9 +8,7 @@
   <title>Kamera Lupe</title>
 
   <style>
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
 
     html, body {
       width: 100%;
@@ -52,13 +50,33 @@
       filter: var(--invert, none) var(--contrast, none);
     }
 
-    /* Filter-Modi */
     .invert-colors {
       --invert: invert(100%);
     }
 
     .high-contrast {
-      --contrast: contrast(220%) brightness(130%);
+      --contrast: contrast(300%) brightness(150%) saturate(120%);
+    }
+
+    /* Zoom Overlay */
+    #zoom-value {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 2rem;
+      font-weight: bold;
+      background: rgba(0,0,0,0.6);
+      padding: 10px 20px;
+      border-radius: 10px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.15s ease;
+      z-index: 5;
+    }
+
+    #zoom-value.visible {
+      opacity: 1;
     }
 
     .controls {
@@ -96,17 +114,6 @@
       accent-color: #ff9500;
     }
 
-    #zoom-value {
-      min-width: 3.5em;
-      text-align: center;
-      opacity: 0;
-      transition: opacity 0.15s ease;
-    }
-
-    #zoom-value.visible {
-      opacity: 1;
-    }
-
     .btn-group {
       display: flex;
       gap: 10px;
@@ -116,28 +123,24 @@
 
     button {
       flex: 1;
-      min-width: 0;
       padding: 8px 6px;
       font-size: 0.8rem;
       font-weight: bold;
-      border: 1px solid rgba(255, 255, 255, 0.2);
       border-radius: 6px;
-      cursor: pointer;
+      border: 1px solid rgba(255,255,255,0.2);
       color: white;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    button:disabled {
-      opacity: 0.4;
-      cursor: not-allowed;
+      cursor: pointer;
     }
 
     #btn-invert { background-color: #007bff; }
     #btn-contrast { background-color: #495057; }
     #btn-torch { background-color: #6c757d; }
     #btn-fullscreen { background-color: #495057; }
+
+    button:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
 
     .sr-only {
       position: absolute;
@@ -150,157 +153,133 @@
 </head>
 
 <body>
-  <div class="app-container">
-    <div class="camera-container" id="cam-box">
-      <video id="webcam" autoplay playsinline muted></video>
-    </div>
 
-    <div class="controls">
-      <div id="zoom-value">1.0x</div>
-
-      <div class="slider-container">
-        <span>1x</span>
-        <input type="range" id="zoom-slider" min="1" max="5" step="0.05" value="1">
-        <span>5x</span>
-      </div>
-
-      <div class="btn-group">
-        <button id="btn-invert" aria-pressed="false">Invertieren</button>
-        <button id="btn-contrast" aria-pressed="false">Kontrast</button>
-        <button id="btn-torch" aria-pressed="false" disabled>Licht</button>
-        <button id="btn-fullscreen" aria-pressed="false">Vollbild</button>
-      </div>
-    </div>
+<div class="app-container">
+  <div class="camera-container" id="cam-box">
+    <video id="webcam" autoplay playsinline muted></video>
+    <div id="zoom-value">1.0x</div>
   </div>
 
-  <script>
-    const video = document.getElementById('webcam');
-    const camBox = document.getElementById('cam-box');
-    const zoomSlider = document.getElementById('zoom-slider');
-    const zoomValueEl = document.getElementById('zoom-value');
+  <div class="controls">
+    <div class="slider-container">
+      <span>1x</span>
+      <input type="range" id="zoom-slider" min="1" max="5" step="0.05" value="1">
+      <span>5x</span>
+    </div>
 
-    const btnInvert = document.getElementById('btn-invert');
-    const btnContrast = document.getElementById('btn-contrast');
-    const btnTorch = document.getElementById('btn-torch');
-    const btnFullscreen = document.getElementById('btn-fullscreen');
+    <div class="btn-group">
+      <button id="btn-invert" aria-pressed="false">Invertieren</button>
+      <button id="btn-contrast" aria-pressed="false">Kontrast</button>
+      <button id="btn-torch" aria-pressed="false" disabled>Licht</button>
+      <button id="btn-fullscreen">Vollbild</button>
+    </div>
+  </div>
+</div>
 
-    let currentTrack = null;
-    let zoomCapable = false;
-    let opticalMax = 1;
-    let torchOn = false;
+<script>
+const video = document.getElementById('webcam');
+const zoomSlider = document.getElementById('zoom-slider');
+const zoomValueEl = document.getElementById('zoom-value');
 
-    async function startCamera() {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "environment" },
-          audio: false
-        });
+const btnInvert = document.getElementById('btn-invert');
+const btnContrast = document.getElementById('btn-contrast');
+const btnTorch = document.getElementById('btn-torch');
+const btnFullscreen = document.getElementById('btn-fullscreen');
+const camBox = document.getElementById('cam-box');
 
-        video.srcObject = stream;
-        currentTrack = stream.getVideoTracks()[0];
+let currentTrack = null;
+let zoomCapable = false;
+let opticalMax = 1;
+let torchOn = false;
+let zoomTimeout;
 
-        const caps = currentTrack.getCapabilities();
+async function startCamera() {
+  const stream = await navigator.mediaDevices.getUserMedia({
+    video: { facingMode: "environment" }
+  });
 
-        if (caps.zoom) {
-          zoomCapable = true;
-          opticalMax = caps.zoom.max;
-          zoomSlider.max = Math.max(opticalMax, 10);
-        }
+  video.srcObject = stream;
+  currentTrack = stream.getVideoTracks()[0];
 
-        if (caps.torch) {
-          btnTorch.disabled = false;
-        }
+  const caps = currentTrack.getCapabilities();
 
-      } catch (err) {
-        alert("Kamerafehler: " + err.message);
-      }
+  if (caps.zoom) {
+    zoomCapable = true;
+    opticalMax = caps.zoom.max;
+    zoomSlider.max = Math.max(opticalMax, 10);
+  }
+
+  if (caps.torch) {
+    btnTorch.disabled = false;
+  }
+}
+
+zoomSlider.addEventListener('input', async (e) => {
+  const val = parseFloat(e.target.value);
+  const isDigital = val > opticalMax;
+
+  zoomValueEl.textContent = val.toFixed(1) + "x";
+  zoomValueEl.classList.add('visible');
+
+  clearTimeout(zoomTimeout);
+  zoomTimeout = setTimeout(() => {
+    zoomValueEl.classList.remove('visible');
+  }, 800);
+
+  if (zoomCapable && currentTrack) {
+    try {
+      const hardwareZoom = Math.min(val, opticalMax);
+      await currentTrack.applyConstraints({ advanced: [{ zoom: hardwareZoom }] });
+
+      video.style.transform = isDigital ? `scale(${val / opticalMax})` : 'scale(1)';
+    } catch {
+      video.style.transform = `scale(${val})`;
     }
+  } else {
+    video.style.transform = `scale(${val})`;
+  }
+});
 
-    zoomSlider.addEventListener('input', async (e) => {
-      const value = parseFloat(e.target.value);
-      const isDigital = value > opticalMax;
+/* Invert */
+btnInvert.onclick = () => {
+  const active = video.classList.toggle('invert-colors');
+  btnInvert.style.backgroundColor = active ? "#dc3545" : "#007bff";
+  btnInvert.setAttribute('aria-pressed', active);
+};
 
-      zoomValueEl.textContent = value.toFixed(1) + "x";
-      zoomValueEl.classList.add('visible');
+/* High Contrast */
+btnContrast.onclick = () => {
+  const active = video.classList.toggle('high-contrast');
+  btnContrast.style.backgroundColor = active ? "#ffc107" : "#495057";
+  btnContrast.setAttribute('aria-pressed', active);
+};
 
-      if (zoomCapable && currentTrack) {
-        try {
-          const hardwareZoom = Math.min(value, opticalMax);
-          await currentTrack.applyConstraints({ advanced: [{ zoom: hardwareZoom }] });
+/* Torch */
+btnTorch.onclick = async () => {
+  torchOn = !torchOn;
+  await currentTrack.applyConstraints({ advanced: [{ torch: torchOn }] });
+};
 
-          video.style.transform = isDigital ? `scale(${value / opticalMax})` : 'scale(1)';
-        } catch {
-          video.style.transform = `scale(${value})`;
-        }
-      } else {
-        video.style.transform = `scale(${value})`;
-      }
-    });
+/* Fullscreen */
+btnFullscreen.onclick = () => {
+  if (!document.fullscreenElement) {
+    document.documentElement.requestFullscreen();
+  } else {
+    document.exitFullscreen();
+  }
+};
 
-    /* Invert */
-    btnInvert.onclick = () => {
-      const active = video.classList.toggle('invert-colors');
-      btnInvert.setAttribute('aria-pressed', active);
-    };
+/* Auto Fullscreen */
+let autoFullscreenDone = false;
+camBox.addEventListener('click', () => {
+  if (!autoFullscreenDone && !document.fullscreenElement) {
+    btnFullscreen.click();
+    autoFullscreenDone = true;
+  }
+});
 
-    /* High Contrast */
-    btnContrast.onclick = () => {
-      const active = video.classList.toggle('high-contrast');
-      btnContrast.setAttribute('aria-pressed', active);
-    };
-
-    /* Torch */
-    btnTorch.onclick = async () => {
-      if (!currentTrack) return;
-
-      try {
-        torchOn = !torchOn;
-        await currentTrack.applyConstraints({ advanced: [{ torch: torchOn }] });
-        btnTorch.setAttribute('aria-pressed', torchOn);
-      } catch (err) {
-        torchOn = !torchOn;
-      }
-    };
-
-    /* Fullscreen */
-    function toggleFullscreen() {
-      if (!document.fullscreenElement) {
-        document.documentElement.requestFullscreen();
-        btnFullscreen.setAttribute('aria-pressed', 'true');
-      } else {
-        document.exitFullscreen();
-        btnFullscreen.setAttribute('aria-pressed', 'false');
-      }
-    }
-
-    btnFullscreen.addEventListener('click', toggleFullscreen);
-
-    let autoFullscreenDone = false;
-    camBox.addEventListener('click', () => {
-      if (!autoFullscreenDone && !document.fullscreenElement) {
-        toggleFullscreen();
-        autoFullscreenDone = true;
-      }
-    });
-
-    function stopCamera() {
-      if (video.srcObject) {
-        video.srcObject.getTracks().forEach(track => track.stop());
-      }
-    }
-
-    document.addEventListener('visibilitychange', () => {
-      if (document.hidden) {
-        stopCamera();
-      } else {
-        startCamera();
-      }
-    });
-
-    window.addEventListener('pagehide', stopCamera);
-
-    startCamera();
-  </script>
+startCamera();
+</script>
 
 </body>
 </html>
