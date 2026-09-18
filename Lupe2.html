@@ -1,155 +1,106 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <title>Kamera Lupe</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kamera Lupe</title>
 
-  <style>
-    * { box-sizing: border-box; }
+<style>
+* { box-sizing: border-box; }
 
-    html, body {
-      width: 100%;
-      height: 100%;
-      margin: 0;
-      padding: 0;
-      background-color: #000;
-      color: white;
-      font-family: Arial, sans-serif;
-      overflow: hidden;
-    }
+html, body {
+  margin: 0;
+  height: 100%;
+  background: black;
+  color: white;
+  font-family: Arial;
+  overflow: hidden;
+}
 
-    .app-container {
-      position: relative;
-      width: 100vw;
-      height: 100vh;
-      height: 100dvh;
-      display: flex;
-      flex-direction: column;
-    }
+.app-container {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
 
-    .camera-container {
-      flex: 1;
-      position: relative;
-      overflow: hidden;
-      background-color: #000;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-    }
+.camera-container {
+  flex: 1;
+  position: relative;
+}
 
-    video {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      transition: transform 0.1s ease-out;
+video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.1s;
+}
 
-      /* Kombinierbare Filter */
-      filter: var(--invert, none) var(--contrast, none);
-    }
+/* Zoom Overlay */
+#zoom-value {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 2rem;
+  background: rgba(0,0,0,0.6);
+  padding: 10px 20px;
+  border-radius: 10px;
+  opacity: 0;
+  transition: 0.2s;
+}
 
-    .invert-colors {
-      --invert: invert(100%);
-    }
+#zoom-value.visible {
+  opacity: 1;
+}
 
-    .high-contrast {
-      --contrast: contrast(300%) brightness(150%) saturate(120%);
-    }
+/* Controls */
+.controls {
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  padding: 10px;
+  background: rgba(0,0,0,0.7);
+}
 
-    /* Zoom Overlay */
-    #zoom-value {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      font-size: 2rem;
-      font-weight: bold;
-      background: rgba(0,0,0,0.6);
-      padding: 10px 20px;
-      border-radius: 10px;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.15s ease;
-      z-index: 5;
-    }
+/* Slider */
+.slider-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
 
-    #zoom-value.visible {
-      opacity: 1;
-    }
+/* Scrollbare Buttons */
+.btn-group {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 5px;
+}
 
-    .controls {
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      width: 100%;
-      padding: 10px 15px calc(15px + env(safe-area-inset-bottom)) 15px;
-      gap: 8px;
-      background: rgba(0, 0, 0, 0.65);
-      backdrop-filter: blur(4px);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      z-index: 10;
-    }
+.btn-group::-webkit-scrollbar {
+  height: 6px;
+}
 
-    .slider-container {
-      display: flex;
-      align-items: center;
-      width: 100%;
-      max-width: 400px;
-      gap: 10px;
-      font-size: 0.85rem;
-      font-weight: bold;
-    }
+.btn-group::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.3);
+  border-radius: 3px;
+}
 
-    input[type=range] {
-      flex-grow: 1;
-      height: 6px;
-      accent-color: #007bff;
-    }
+button {
+  flex: 0 0 auto;
+  padding: 10px;
+  font-size: 0.9rem;
+  border-radius: 6px;
+  border: none;
+  color: white;
+}
 
-    input[type=range].digital-zoom {
-      accent-color: #ff9500;
-    }
+#btn-invert { background: #007bff; }
+#btn-contrast { background: #495057; }
+#btn-torch { background: #6c757d; }
+#btn-fullscreen { background: #495057; }
 
-    .btn-group {
-      display: flex;
-      gap: 10px;
-      width: 100%;
-      max-width: 400px;
-    }
-
-    button {
-      flex: 1;
-      padding: 8px 6px;
-      font-size: 0.8rem;
-      font-weight: bold;
-      border-radius: 6px;
-      border: 1px solid rgba(255,255,255,0.2);
-      color: white;
-      cursor: pointer;
-    }
-
-    #btn-invert { background-color: #007bff; }
-    #btn-contrast { background-color: #495057; }
-    #btn-torch { background-color: #6c757d; }
-    #btn-fullscreen { background-color: #495057; }
-
-    button:disabled {
-      opacity: 0.4;
-      cursor: not-allowed;
-    }
-
-    .sr-only {
-      position: absolute;
-      width: 1px;
-      height: 1px;
-      margin: -1px;
-      overflow: hidden;
-    }
-  </style>
+</style>
 </head>
 
 <body>
@@ -161,6 +112,7 @@
   </div>
 
   <div class="controls">
+
     <div class="slider-container">
       <span>1x</span>
       <input type="range" id="zoom-slider" min="1" max="5" step="0.05" value="1">
@@ -168,30 +120,42 @@
     </div>
 
     <div class="btn-group">
-      <button id="btn-invert" aria-pressed="false">Invertieren</button>
-      <button id="btn-contrast" aria-pressed="false">Kontrast</button>
-      <button id="btn-torch" aria-pressed="false" disabled>Licht</button>
+      <button id="btn-invert">Invert</button>
+      <button id="btn-contrast">Kontrast</button>
+      <button id="btn-torch" disabled>Licht</button>
       <button id="btn-fullscreen">Vollbild</button>
     </div>
+
   </div>
 </div>
 
 <script>
 const video = document.getElementById('webcam');
 const zoomSlider = document.getElementById('zoom-slider');
-const zoomValueEl = document.getElementById('zoom-value');
+const zoomValue = document.getElementById('zoom-value');
 
 const btnInvert = document.getElementById('btn-invert');
 const btnContrast = document.getElementById('btn-contrast');
 const btnTorch = document.getElementById('btn-torch');
 const btnFullscreen = document.getElementById('btn-fullscreen');
-const camBox = document.getElementById('cam-box');
 
-let currentTrack = null;
-let zoomCapable = false;
+let track = null;
 let opticalMax = 1;
+let zoomCapable = false;
 let torchOn = false;
-let zoomTimeout;
+
+let invert = false;
+let contrast = false;
+
+/* FILTER LOGIK (FIX) */
+function updateFilter() {
+  let filters = [];
+
+  if (invert) filters.push("invert(100%)");
+  if (contrast) filters.push("contrast(300%) brightness(150%)");
+
+  video.style.filter = filters.join(" ");
+}
 
 async function startCamera() {
   const stream = await navigator.mediaDevices.getUserMedia({
@@ -199,9 +163,9 @@ async function startCamera() {
   });
 
   video.srcObject = stream;
-  currentTrack = stream.getVideoTracks()[0];
+  track = stream.getVideoTracks()[0];
 
-  const caps = currentTrack.getCapabilities();
+  const caps = track.getCapabilities();
 
   if (caps.zoom) {
     zoomCapable = true;
@@ -214,53 +178,52 @@ async function startCamera() {
   }
 }
 
+/* Zoom */
+let timeout;
+
 zoomSlider.addEventListener('input', async (e) => {
   const val = parseFloat(e.target.value);
-  const isDigital = val > opticalMax;
 
-  zoomValueEl.textContent = val.toFixed(1) + "x";
-  zoomValueEl.classList.add('visible');
+  zoomValue.textContent = val.toFixed(1) + "x";
+  zoomValue.classList.add("visible");
 
-  clearTimeout(zoomTimeout);
-  zoomTimeout = setTimeout(() => {
-    zoomValueEl.classList.remove('visible');
+  clearTimeout(timeout);
+  timeout = setTimeout(() => {
+    zoomValue.classList.remove("visible");
   }, 800);
 
-  if (zoomCapable && currentTrack) {
-    try {
-      const hardwareZoom = Math.min(val, opticalMax);
-      await currentTrack.applyConstraints({ advanced: [{ zoom: hardwareZoom }] });
+  if (zoomCapable) {
+    await track.applyConstraints({ advanced: [{ zoom: Math.min(val, opticalMax) }] });
 
-      video.style.transform = isDigital ? `scale(${val / opticalMax})` : 'scale(1)';
-    } catch {
-      video.style.transform = `scale(${val})`;
+    if (val > opticalMax) {
+      video.style.transform = `scale(${val / opticalMax})`;
+    } else {
+      video.style.transform = "scale(1)";
     }
   } else {
     video.style.transform = `scale(${val})`;
   }
 });
 
-/* Invert */
+/* Buttons */
+
 btnInvert.onclick = () => {
-  const active = video.classList.toggle('invert-colors');
-  btnInvert.style.backgroundColor = active ? "#dc3545" : "#007bff";
-  btnInvert.setAttribute('aria-pressed', active);
+  invert = !invert;
+  btnInvert.style.background = invert ? "#dc3545" : "#007bff";
+  updateFilter();
 };
 
-/* High Contrast */
 btnContrast.onclick = () => {
-  const active = video.classList.toggle('high-contrast');
-  btnContrast.style.backgroundColor = active ? "#ffc107" : "#495057";
-  btnContrast.setAttribute('aria-pressed', active);
+  contrast = !contrast;
+  btnContrast.style.background = contrast ? "#ffc107" : "#495057";
+  updateFilter();
 };
 
-/* Torch */
 btnTorch.onclick = async () => {
   torchOn = !torchOn;
-  await currentTrack.applyConstraints({ advanced: [{ torch: torchOn }] });
+  await track.applyConstraints({ advanced: [{ torch: torchOn }] });
 };
 
-/* Fullscreen */
 btnFullscreen.onclick = () => {
   if (!document.fullscreenElement) {
     document.documentElement.requestFullscreen();
@@ -268,15 +231,6 @@ btnFullscreen.onclick = () => {
     document.exitFullscreen();
   }
 };
-
-/* Auto Fullscreen */
-let autoFullscreenDone = false;
-camBox.addEventListener('click', () => {
-  if (!autoFullscreenDone && !document.fullscreenElement) {
-    btnFullscreen.click();
-    autoFullscreenDone = true;
-  }
-});
 
 startCamera();
 </script>
