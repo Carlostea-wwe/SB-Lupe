@@ -98,6 +98,12 @@
     #zoom-value {
       min-width: 3.5em;
       text-align: center;
+      opacity: 0;
+      transition: opacity 0.15s ease;
+    }
+
+    #zoom-value.visible {
+      opacity: 1;
     }
 
     .btn-group {
@@ -109,13 +115,17 @@
 
     button {
       flex: 1;
-      padding: 8px 10px;
-      font-size: 0.85rem;
+      min-width: 0;
+      padding: 8px 6px;
+      font-size: 0.8rem;
       font-weight: bold;
       border: 1px solid rgba(255, 255, 255, 0.2);
       border-radius: 6px;
       cursor: pointer;
       color: white;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     button:disabled {
@@ -246,9 +256,18 @@
     // (unschärfer) weitergezoomt wird.
     function updateZoomDisplay(value, isDigital) {
       zoomValueEl.textContent = `${value.toFixed(1)}x`;
+      zoomValueEl.classList.add('visible');
       zoomSlider.setAttribute('aria-valuetext', `${value.toFixed(1)}x Zoom${isDigital ? ' (digital)' : ''}`);
       zoomSlider.classList.toggle('digital-zoom', isDigital);
     }
+
+    function hideZoomDisplay() {
+      zoomValueEl.classList.remove('visible');
+    }
+
+    zoomSlider.addEventListener('change', hideZoomDisplay);
+    zoomSlider.addEventListener('pointerup', hideZoomDisplay);
+    zoomSlider.addEventListener('touchend', hideZoomDisplay);
 
     // Zoom-Logik: bis zur optischen Grenze echter Kamera-Zoom (scharf),
     // darüber hinaus zusätzlich CSS-Skalierung als Digitalzoom-Fallback.
