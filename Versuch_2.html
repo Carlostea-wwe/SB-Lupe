@@ -1,6 +1,40 @@
-<!-- Full self-contained offline version placeholder - real content is 189KB and will be pushed -->
 <!DOCTYPE html>
 <html lang="de">
-<head><title>SB-Lupe Versuch 2 - Offline</title></head>
-<body><h1>Full offline version is being uploaded (189 KB).</h1></body>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="description" content="SB-Lupe: Kamera-Lupe mit großer Schrift und starken Kontrasten.">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#000000">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="SB-Lupe">
+  <title>SB-Lupe - Versuch 2</title>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <div class="app">
+    <h1 class="sr-only">SB-Lupe</h1>
+    <p id="app-desc" class="sr-only">Kamera-Lupe für kleines Schrift.</p>
+    <main class="stage">
+      <div class="view" id="view-wrap">
+        <video id="video" autoplay playsinline muted></video>
+        <canvas id="view"></canvas>
+      </div>
+    </main>
+    <div class="dock">
+      <div class="zoom-row">
+        <input type="range" id="zoom-slider" min="1" max="10" step="0.05" value="1">
+      </div>
+      <nav class="bar" id="bar"></nav>
+    </div>
+  </div>
+  <script src="js/modes.js"></script>
+  <script src="js/demo.js"></script>
+  <script src="js/camera.js"></script>
+  <script src="js/renderer.js"></script>
+  <script src="js/settings.js"></script>
+  <script src="js/app.js"></script>
+</body>
 </html>
